@@ -85,6 +85,11 @@ class RolloutStorage:
         hid_a = hidden_states[0] if isinstance(hidden_states[0], tuple) else (hidden_states[0],)
         hid_c = hidden_states[1] if isinstance(hidden_states[1], tuple) else (hidden_states[1],)
 
+        # Check if any hidden state is None (not yet initialized)
+        # This can happen with causal transformers before first forward pass
+        if any(h is None for h in hid_a) or any(h is None for h in hid_c):
+            return
+
         # initialize if needed
         if self.saved_hidden_states_a is None:
             self.saved_hidden_states_a = [
@@ -200,25 +205,31 @@ class RolloutStorage:
                 values_batch = self.values[:, start:stop]
                 old_actions_log_prob_batch = self.actions_log_prob[:, start:stop]
 
-                # reshape to [num_envs, time, num layers, hidden dim] (original shape: [time, num_layers, num_envs, hidden_dim])
-                # then take only time steps after dones (flattens num envs and time dimensions),
-                # take a batch of trajectories and finally reshape back to [num_layers, batch, hidden_dim]
-                last_was_done = last_was_done.permute(1, 0)
-                hid_a_batch = [
-                    saved_hidden_states.permute(2, 0, 1, 3)[last_was_done][first_traj:last_traj]
-                    .transpose(1, 0)
-                    .contiguous()
-                    for saved_hidden_states in self.saved_hidden_states_a
-                ]
-                hid_c_batch = [
-                    saved_hidden_states.permute(2, 0, 1, 3)[last_was_done][first_traj:last_traj]
-                    .transpose(1, 0)
-                    .contiguous()
-                    for saved_hidden_states in self.saved_hidden_states_c
-                ]
-                # remove the tuple for GRU
-                hid_a_batch = hid_a_batch[0] if len(hid_a_batch) == 1 else hid_a_batch
-                hid_c_batch = hid_c_batch[0] if len(hid_c_batch) == 1 else hid_c_batch
+                # Check if hidden states were saved (for recurrent policies)
+                if self.saved_hidden_states_a is None or self.saved_hidden_states_c is None:
+                    # No hidden states saved - not a recurrent policy or memory not initialized
+                    hid_a_batch = None
+                    hid_c_batch = None
+                else:
+                    # reshape to [num_envs, time, num layers, hidden dim] (original shape: [time, num_layers, num_envs, hidden_dim])
+                    # then take only time steps after dones (flattens num envs and time dimensions),
+                    # take a batch of trajectories and finally reshape back to [num_layers, batch, hidden_dim]
+                    last_was_done = last_was_done.permute(1, 0)
+                    hid_a_batch = [
+                        saved_hidden_states.permute(2, 0, 1, 3)[last_was_done][first_traj:last_traj]
+                        .transpose(1, 0)
+                        .contiguous()
+                        for saved_hidden_states in self.saved_hidden_states_a
+                    ]
+                    hid_c_batch = [
+                        saved_hidden_states.permute(2, 0, 1, 3)[last_was_done][first_traj:last_traj]
+                        .transpose(1, 0)
+                        .contiguous()
+                        for saved_hidden_states in self.saved_hidden_states_c
+                    ]
+                    # remove the tuple for GRU
+                    hid_a_batch = hid_a_batch[0] if len(hid_a_batch) == 1 else hid_a_batch
+                    hid_c_batch = hid_c_batch[0] if len(hid_c_batch) == 1 else hid_c_batch
 
                 yield obs_batch, critic_obs_batch, actions_batch, values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch, old_mu_batch, old_sigma_batch, (
                     hid_a_batch,

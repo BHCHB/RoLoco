@@ -13,7 +13,7 @@ from torch.utils.tensorboard import SummaryWriter as TensorboardSummaryWriter
 import rsl_rl
 from rsl_rl.algorithms import PPO
 from rsl_rl.env import VecEnv
-from rsl_rl.modules import ActorCritic, ActorCriticRecurrent, ActorCriticDepthCNN, ActorCriticDepthCNNRecurrent, EmpiricalNormalization
+from rsl_rl.modules import ActorCriticTransformer, ActorCriticEmbedding,ActorCritic, ActorCriticRecurrent, ActorCriticDepthCNN, ActorCriticDepthCNNRecurrent, EmpiricalNormalization
 from rsl_rl.utils import store_code_state
 
 
@@ -38,7 +38,7 @@ class OnPolicyRunner:
             self.policy_cfg["num_actor_obs_prop"] = num_actor_obs_prop * (self.policy_cfg.get("history_length", 0) + 1)
         
         actor_critic_class = eval(self.policy_cfg.pop("class_name"))  # ActorCritic
-        actor_critic: ActorCritic | ActorCriticRecurrent | ActorCriticDepthCNN | ActorCriticDepthCNNRecurrent = actor_critic_class(
+        actor_critic: ActorCriticTransformer | ActorCriticEmbedding | ActorCritic | ActorCriticRecurrent | ActorCriticDepthCNN | ActorCriticDepthCNNRecurrent = actor_critic_class(
             num_obs, num_critic_obs, self.env.num_actions, **self.policy_cfg
         ).to(self.device)
         # if not self.cfg.get("use_cnn", False):

@@ -41,9 +41,15 @@ class Go2RoughPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     experiment_name = "go2_base"
     empirical_normalization = False
     policy = RslRlPpoActorCriticCfg(
+        class_name="ActorCriticEmbedding",
         init_noise_std=1.0,
-        actor_hidden_dims=[512, 256, 128],
-        critic_hidden_dims=[512, 256, 128],
+        # Embedding layer configuration
+        embedding_dim=512,  # Standard transformer dimension
+        embedding_hidden_dim=256,  # Hidden dimension in embedding MLP
+        embedding_dropout=0.1,  # Dropout for regularization
+        # Adjusted MLP dimensions (smaller since embedding handles feature extraction)
+        actor_hidden_dims=[256, 256, 128],
+        critic_hidden_dims=[256, 256, 128],
         activation="elu",
     )
     algorithm = RslRlPpoAlgorithmCfg(
